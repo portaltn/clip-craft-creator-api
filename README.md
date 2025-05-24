@@ -1,73 +1,127 @@
-# Welcome to your Lovable project
 
-## Project info
+# ClipCraft - Sistema de Criação de Vídeos
 
-**URL**: https://lovable.dev/projects/1da46901-1024-4b90-a31f-91e0bdcbedf1
+Sistema completo para criação de vídeos curtos para redes sociais com API própria.
 
-## How can I edit this code?
+## Funcionalidades
 
-There are several ways of editing your application.
+- ✅ Criação de vídeos nos formatos 1:1, 9:16, 4:5 e 16:9
+- ✅ Templates otimizados para redes sociais
+- ✅ API RESTful completa
+- ✅ Painel administrativo
+- ✅ Processamento assíncrono com status em tempo real
+- ✅ Upload e download de arquivos
+- ✅ Documentação da API interativa
 
-**Use Lovable**
+## Instalação
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/1da46901-1024-4b90-a31f-91e0bdcbedf1) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### Frontend (React)
+```bash
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Backend (Node.js API)
+```bash
+cd server
+npm install
+npm start
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Endpoints da API
 
-**Use GitHub Codespaces**
+### Criação de Vídeos
+- `POST /api/create-video` - Criar novo vídeo
+- `GET /api/job-status/:id` - Status do processamento
+- `GET /api/download/:id` - Download do vídeo
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Gerenciamento
+- `GET /api/jobs` - Listar todos os jobs
+- `DELETE /api/jobs/:id` - Deletar job
+- `POST /api/upload` - Upload de arquivo
+- `GET /api/health` - Health check
 
-## What technologies are used for this project?
+### Templates
+- `GET /api/templates` - Templates disponíveis
 
-This project is built with:
+## Estrutura do Projeto
 
-- Vite
+```
+├── src/                    # Frontend React
+│   ├── components/         # Componentes React
+│   ├── lib/               # API client e utilitários
+│   └── pages/             # Páginas da aplicação
+├── server/                # Backend API
+│   ├── index.js          # Servidor Express
+│   ├── package.json      # Dependências do backend
+│   ├── uploads/          # Arquivos enviados
+│   ├── outputs/          # Vídeos processados
+│   └── temp/             # Arquivos temporários
+└── README.md
+```
+
+## Uso da API
+
+### Exemplo: Criar vídeo
+```javascript
+const config = {
+  segments: [
+    {
+      id: "seg1",
+      type: "image",
+      mediaUrl: "https://exemplo.com/imagem.jpg",
+      duration: 5,
+      text: "Meu Texto",
+      textPosition: "center",
+      fontSize: 60,
+      fontColor: "#ffffff"
+    }
+  ],
+  resize: "1080x1080",
+  fps: 30
+};
+
+const response = await fetch('/api/create-video', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(config)
+});
+
+const { job_id } = await response.json();
+```
+
+### Exemplo: Verificar status
+```javascript
+const status = await fetch(`/api/job-status/${job_id}`);
+const jobData = await status.json();
+
+if (jobData.status === 'completed') {
+  // Download disponível em jobData.download_url
+}
+```
+
+## Configuração para Produção
+
+1. Configure as variáveis de ambiente
+2. Altere a URL base da API em `src/lib/api.ts`
+3. Configure proxy reverso (nginx/apache)
+4. Configure SSL/HTTPS
+
+## Tecnologias Utilizadas
+
+### Frontend
+- React 18
 - TypeScript
-- React
-- shadcn-ui
 - Tailwind CSS
+- shadcn/ui
+- React Query
 
-## How can I deploy this project?
+### Backend
+- Node.js
+- Express
+- Multer (upload de arquivos)
+- CORS
 
-Simply open [Lovable](https://lovable.dev/projects/1da46901-1024-4b90-a31f-91e0bdcbedf1) and click on Share -> Publish.
+## Licença
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+MIT License

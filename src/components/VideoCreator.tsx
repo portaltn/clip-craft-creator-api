@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,37 +12,27 @@ import { Progress } from "@/components/ui/progress";
 import { AlertCircle, CheckCircle, Clock, Download, Plus, Trash2, Upload, Wand2, Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SocialMediaTemplates } from "@/components/SocialMediaTemplates";
-
-interface VideoSegment {
-  id: string;
-  type: 'image' | 'video';
-  mediaUrl: string;
-  duration?: number;
-  text?: string;
-  textPosition?: string;
-  fontSize?: number;
-  fontColor?: string;
-  transition?: string;
-}
-
-interface VideoJob {
-  id: string;
-  status: 'queued' | 'processing' | 'completed' | 'error';
-  progress: number;
-  downloadUrl?: string;
-  error?: string;
-  createdAt: string;
-}
+import { api, VideoSegment, VideoJob } from "@/lib/api";
 
 export const VideoCreator = () => {
   const { toast } = useToast();
   const [segments, setSegments] = useState<VideoSegment[]>([]);
   const [currentJob, setCurrentJob] = useState<VideoJob | null>(null);
+  const [jobCheckInterval, setJobCheckInterval] = useState<NodeJS.Timeout | null>(null);
   const [globalSettings, setGlobalSettings] = useState({
     backgroundAudio: '',
     resize: '1080x1080',
     fps: 30
   });
+
+  // Limpar interval ao desmontar componente
+  useEffect(() => {
+    return () => {
+      if (jobCheckInterval) {
+        clearInterval(jobCheckInterval);
+      }
+    };
+  }, [jobCheckInterval]);
 
   const addSegment = () => {
     const newSegment: VideoSegment = {
@@ -77,6 +68,39 @@ export const VideoCreator = () => {
     });
   };
 
+  const checkJobStatus = async (jobId: string) => {
+    try {
+      const jobStatus = await api.getJobStatus(jobId);
+      setCurrentJob(jobStatus);
+
+      if (jobStatus.status === 'completed' || jobStatus.status === 'error') {
+        if (jobCheckInterval) {
+          clearInterval(jobCheckInterval);
+          setJobCheckInterval(null);
+        }
+
+        if (jobStatus.status === 'completed') {
+          toast({
+            title: "Vídeo Concluído!",
+            description: "Seu vídeo foi processado com sucesso e está pronto para download.",
+          });
+        } else if (jobStatus.status === 'error') {
+          toast({
+            title: "Erro no Processamento",
+            description: jobStatus.error || "Ocorreu um erro durante o processamento do vídeo.",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao verificar status do job:', error);
+      if (jobCheckInterval) {
+        clearInterval(jobCheckInterval);
+        setJobCheckInterval(null);
+      }
+    }
+  };
+
   const createVideo = async () => {
     if (segments.length === 0) {
       toast({
@@ -87,59 +111,72 @@ export const VideoCreator = () => {
       return;
     }
 
-    // Simular criação de vídeo
-    const jobId = Math.random().toString(36).substr(2, 9);
-    const newJob: VideoJob = {
-      id: jobId,
-      status: 'queued',
-      progress: 0,
-      createdAt: new Date().toISOString()
-    };
+    try {
+      const config = {
+        segments: segments,
+        backgroundAudio: globalSettings.backgroundAudio,
+        resize: globalSettings.resize,
+        fps: globalSettings.fps
+      };
 
-    setCurrentJob(newJob);
+      const response = await api.createVideo(config);
+      
+      const newJob: VideoJob = {
+        job_id: response.job_id,
+        status: 'queued',
+        progress: 0,
+        created_at: new Date().toISOString()
+      };
 
-    toast({
-      title: "Vídeo em Processamento",
-      description: `Job ID: ${jobId}`,
-    });
+      setCurrentJob(newJob);
 
-    // Simular progresso
-    const progressInterval = setInterval(() => {
-      setCurrentJob(prev => {
-        if (!prev) return prev;
-        
-        const newProgress = Math.min(prev.progress + Math.random() * 15, 100);
-        
-        if (newProgress >= 100) {
-          clearInterval(progressInterval);
-          return {
-            ...prev,
-            status: 'completed',
-            progress: 100,
-            downloadUrl: `/api/download/${jobId}`
-          };
-        }
-        
-        return {
-          ...prev,
-          status: 'processing',
-          progress: newProgress
-        };
+      toast({
+        title: "Vídeo em Processamento",
+        description: `Job ID: ${response.job_id}`,
       });
-    }, 1000);
+
+      // Iniciar verificação periódica do status
+      const interval = setInterval(() => {
+        checkJobStatus(response.job_id);
+      }, 2000);
+      
+      setJobCheckInterval(interval);
+
+    } catch (error) {
+      console.error('Erro ao criar vídeo:', error);
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao criar vídeo",
+        variant: "destructive",
+      });
+    }
   };
 
-  const downloadVideo = () => {
-    if (currentJob?.downloadUrl) {
+  const downloadVideo = async () => {
+    if (!currentJob?.job_id) return;
+
+    try {
+      await api.downloadVideo(currentJob.job_id);
       toast({
         title: "Download Iniciado",
         description: "Seu vídeo está sendo baixado",
+      });
+    } catch (error) {
+      console.error('Erro ao baixar vídeo:', error);
+      toast({
+        title: "Erro no Download",
+        description: error instanceof Error ? error.message : "Erro ao baixar vídeo",
+        variant: "destructive",
       });
     }
   };
 
   const resetJob = () => {
     setCurrentJob(null);
+    if (jobCheckInterval) {
+      clearInterval(jobCheckInterval);
+      setJobCheckInterval(null);
+    }
   };
 
   const socialMediaResolutions = [
@@ -421,7 +458,7 @@ export const VideoCreator = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Job ID:</span>
-                      <code className="text-xs bg-gray-100 px-2 py-1 rounded">{currentJob.id}</code>
+                      <code className="text-xs bg-gray-100 px-2 py-1 rounded">{currentJob.job_id}</code>
                     </div>
                     
                     <div className="flex items-center space-x-2">

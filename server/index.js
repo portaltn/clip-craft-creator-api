@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -53,6 +52,21 @@ const upload = multer({
 // Armazenamento em memória para jobs
 const videoJobs = new Map();
 
+// Função para criar um arquivo MP4 válido mínimo (placeholder)
+function createValidMP4File(outputPath) {
+  // Cabeçalho MP4 básico válido para um arquivo vazio
+  const mp4Header = Buffer.from([
+    0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, // ftyp box
+    0x69, 0x73, 0x6F, 0x6D, 0x00, 0x00, 0x02, 0x00,
+    0x69, 0x73, 0x6F, 0x6D, 0x69, 0x73, 0x6F, 0x32,
+    0x61, 0x76, 0x63, 0x31, 0x6D, 0x70, 0x34, 0x31,
+    0x00, 0x00, 0x00, 0x08, 0x66, 0x72, 0x65, 0x65 // free box
+  ]);
+  
+  fs.writeFileSync(outputPath, mp4Header);
+  console.log(`Arquivo MP4 válido criado: ${outputPath}`);
+}
+
 // Classe para processamento de vídeos
 class VideoProcessor {
   constructor() {
@@ -100,12 +114,12 @@ class VideoProcessor {
       job.progress = 95;
       await this.simulateStep('Finalizando processamento', 1000);
 
-      // Criar arquivo de saída simulado
+      // Criar arquivo de saída válido
       const outputFilename = `video_${jobId}.mp4`;
       const outputPath = path.join('outputs', outputFilename);
       
-      // Criar um arquivo vazio como placeholder
-      fs.writeFileSync(outputPath, 'Arquivo de vídeo simulado');
+      // Criar um arquivo MP4 válido (placeholder)
+      createValidMP4File(outputPath);
 
       job.status = 'completed';
       job.progress = 100;
@@ -205,21 +219,47 @@ app.get('/api/download/:jobId', (req, res) => {
   const { jobId } = req.params;
   const job = videoJobs.get(jobId);
 
+  console.log(`Tentativa de download para job: ${jobId}`);
+
   if (!job) {
+    console.log(`Job ${jobId} não encontrado`);
     return res.status(404).json({ error: 'Job não encontrado' });
   }
 
   if (job.status !== 'completed') {
+    console.log(`Job ${jobId} não está completo. Status: ${job.status}`);
     return res.status(400).json({ error: 'Vídeo ainda não está pronto' });
   }
 
-  const filePath = path.join('outputs', job.outputFile);
+  const filePath = path.join(__dirname, 'outputs', job.outputFile);
+  console.log(`Tentando baixar arquivo: ${filePath}`);
   
   if (!fs.existsSync(filePath)) {
+    console.log(`Arquivo não encontrado: ${filePath}`);
     return res.status(404).json({ error: 'Arquivo não encontrado' });
   }
 
-  res.download(filePath, `video_${jobId}.mp4`);
+  // Configurar headers para download
+  res.setHeader('Content-Type', 'video/mp4');
+  res.setHeader('Content-Disposition', `attachment; filename="video_${jobId}.mp4"`);
+  res.setHeader('Content-Length', fs.statSync(filePath).size);
+
+  console.log(`Iniciando download do arquivo: ${filePath}`);
+  
+  // Criar stream e enviar arquivo
+  const fileStream = fs.createReadStream(filePath);
+  fileStream.pipe(res);
+
+  fileStream.on('error', (error) => {
+    console.error('Erro ao enviar arquivo:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erro ao enviar arquivo' });
+    }
+  });
+
+  fileStream.on('end', () => {
+    console.log(`Download concluído para job: ${jobId}`);
+  });
 });
 
 // Listar jobs

@@ -1,4 +1,3 @@
-
 const API_BASE_URL = 'http://localhost:3001/api';
 
 export interface VideoSegment {
@@ -67,23 +66,47 @@ export class ClipCraftAPI {
   }
 
   async downloadVideo(jobId: string): Promise<void> {
+    console.log(`Iniciando download para job: ${jobId}`);
+    
     const response = await fetch(`${this.baseUrl}/download/${jobId}`);
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Erro ao baixar vídeo');
+      const errorText = await response.text();
+      console.error('Erro na resposta do download:', errorText);
+      
+      try {
+        const error = JSON.parse(errorText);
+        throw new Error(error.error || 'Erro ao baixar vídeo');
+      } catch {
+        throw new Error('Erro ao baixar vídeo');
+      }
     }
 
+    // Obter o blob do vídeo
     const blob = await response.blob();
+    console.log(`Blob recebido. Tamanho: ${blob.size} bytes`);
+
+    if (blob.size === 0) {
+      throw new Error('Arquivo vazio recebido');
+    }
+
+    // Criar URL para download
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.style.display = 'none';
     a.href = url;
     a.download = `video_${jobId}.mp4`;
+    
     document.body.appendChild(a);
+    console.log('Iniciando download do arquivo...');
     a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    
+    // Cleanup
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      console.log('Download concluído e recursos limpos');
+    }, 100);
   }
 
   async getJobs(): Promise<VideoJob[]> {

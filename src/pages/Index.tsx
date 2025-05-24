@@ -4,11 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Video, Zap, BarChart3, Settings, Play, Download, Clock, CheckCircle, AlertCircle, Plus, Code, Palette, Layers } from "lucide-react";
+import { Video, Zap, BarChart3, Settings, Play, Download, Clock, CheckCircle, AlertCircle, Plus, Code } from "lucide-react";
 import { VideoCreator } from "@/components/VideoCreator";
 import { AdminPanel } from "@/components/AdminPanel";
 import { ApiDocumentation } from "@/components/ApiDocumentation";
-import { TemplateGallery } from "@/components/TemplateGallery";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("creator");
@@ -27,7 +26,7 @@ const Index = () => {
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                   ClipCraft
                 </h1>
-                <p className="text-sm text-gray-600">Sistema de Criação de Vídeos</p>
+                <p className="text-sm text-gray-600">Sistema de Criação de Vídeos para Redes Sociais</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -43,7 +42,7 @@ const Index = () => {
       {/* Navigation Tabs */}
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8 bg-white/50 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-3 mb-8 bg-white/50 backdrop-blur-sm">
             <TabsTrigger value="creator" className="flex items-center space-x-2">
               <Plus className="w-4 h-4" />
               <span>Criar Vídeo</span>
@@ -51,10 +50,6 @@ const Index = () => {
             <TabsTrigger value="admin" className="flex items-center space-x-2">
               <BarChart3 className="w-4 h-4" />
               <span>Painel Admin</span>
-            </TabsTrigger>
-            <TabsTrigger value="templates" className="flex items-center space-x-2">
-              <Palette className="w-4 h-4" />
-              <span>Templates</span>
             </TabsTrigger>
             <TabsTrigger value="api" className="flex items-center space-x-2">
               <Code className="w-4 h-4" />
@@ -66,11 +61,11 @@ const Index = () => {
           <TabsContent value="creator" className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Crie Vídeos Incríveis em Segundos
+                Crie Vídeos para Redes Sociais
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Combine imagens, textos, áudios e efeitos para criar vídeos profissionais 
-                automaticamente via API ou interface visual.
+                Sistema otimizado para criação de vídeos nos formatos mais utilizados: 
+                Instagram Posts (1:1), Stories (9:16), Feed (4:5) e YouTube (16:9).
               </p>
             </div>
 
@@ -83,8 +78,8 @@ const Index = () => {
                       <Video className="w-6 h-6 text-purple-600" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-gray-900">150+</p>
-                      <p className="text-sm text-gray-600">Vídeos Criados</p>
+                      <p className="text-2xl font-bold text-gray-900">1:1</p>
+                      <p className="text-sm text-gray-600">Instagram Post</p>
                     </div>
                   </div>
                 </CardContent>
@@ -94,11 +89,11 @@ const Index = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Zap className="w-6 h-6 text-blue-600" />
+                      <Video className="w-6 h-6 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-gray-900">2.3s</p>
-                      <p className="text-sm text-gray-600">Tempo Médio</p>
+                      <p className="text-2xl font-bold text-gray-900">9:16</p>
+                      <p className="text-sm text-gray-600">Stories/Reels</p>
                     </div>
                   </div>
                 </CardContent>
@@ -108,11 +103,11 @@ const Index = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <CheckCircle className="w-6 h-6 text-green-600" />
+                      <Video className="w-6 h-6 text-green-600" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-gray-900">98%</p>
-                      <p className="text-sm text-gray-600">Taxa Sucesso</p>
+                      <p className="text-2xl font-bold text-gray-900">4:5</p>
+                      <p className="text-sm text-gray-600">Feed Vertical</p>
                     </div>
                   </div>
                 </CardContent>
@@ -122,11 +117,11 @@ const Index = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                      <Layers className="w-6 h-6 text-orange-600" />
+                      <Video className="w-6 h-6 text-orange-600" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-gray-900">12</p>
-                      <p className="text-sm text-gray-600">Templates</p>
+                      <p className="text-2xl font-bold text-gray-900">16:9</p>
+                      <p className="text-sm text-gray-600">YouTube</p>
                     </div>
                   </div>
                 </CardContent>
@@ -139,11 +134,6 @@ const Index = () => {
           {/* Admin Panel Tab */}
           <TabsContent value="admin" className="space-y-6">
             <AdminPanel />
-          </TabsContent>
-
-          {/* Templates Tab */}
-          <TabsContent value="templates" className="space-y-6">
-            <TemplateGallery />
           </TabsContent>
 
           {/* API Documentation Tab */}

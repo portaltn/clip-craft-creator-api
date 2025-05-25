@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +22,8 @@ import {
   Settings,
   Download,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Code
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -115,6 +115,7 @@ export const CanvaEditor = () => {
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [showVariables, setShowVariables] = useState(false);
+  const [showApiInfo, setShowApiInfo] = useState(false);
 
   const activeSegment = template.segments.find(s => s.id === activeSegmentId);
   const selectedElement = activeSegment?.elements.find(e => e.id === selectedElementId);
@@ -345,6 +346,35 @@ export const CanvaEditor = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copiado!",
+      description: "Código copiado para a área de transferência",
+    });
+  };
+
+  const generateApiExample = () => {
+    if (!template.id) return '';
+    
+    const variables: Record<string, any> = {};
+    template.segments.forEach(segment => {
+      segment.elements.forEach(element => {
+        if (element.variable) {
+          variables[element.variable] = element.type === 'text' ? element.text : element.mediaUrl;
+        }
+      });
+    });
+
+    return `POST /api/create-video
+{
+  "template_id": "${template.id}",
+  "variables": ${JSON.stringify(variables, null, 2)},
+  "resize": "${template.width}x${template.height}",
+  "fps": ${template.fps}
+}`;
   };
 
   const handleMouseDown = (e: React.MouseEvent, element: Element, handle?: string) => {
@@ -643,12 +673,104 @@ export const CanvaEditor = () => {
               <Eye className="w-4 h-4 mr-2" />
               Variáveis
             </Button>
+            {template.id && (
+              <Button onClick={() => setShowApiInfo(!showApiInfo)} variant="outline">
+                <Code className="w-4 h-4 mr-2" />
+                API Info
+              </Button>
+            )}
             <Button onClick={saveTemplate}>
               <Save className="w-4 h-4 mr-2" />
               Salvar Template
             </Button>
           </div>
         </div>
+
+        {/* API Info Card */}
+        {showApiInfo && template.id && (
+          <div className="bg-blue-50 border-b p-4">
+            <Card className="bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <span className="flex items-center">
+                    <Code className="w-5 h-5 mr-2" />
+                    Informações da API
+                  </span>
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    onClick={() => setShowApiInfo(false)}
+                  >
+                    ×
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="font-medium">Template ID</Label>
+                    <div className="flex items-center space-x-2">
+                      <Input value={template.id} readOnly className="font-mono text-sm" />
+                      <Button size="sm" variant="outline" onClick={() => copyToClipboard(template.id!)}>
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="font-medium">Dimensões</Label>
+                    <Input value={`${template.width}x${template.height} @ ${template.fps}fps`} readOnly />
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="font-medium">Variáveis Disponíveis</Label>
+                  <div className="mt-2 space-y-2">
+                    {template.segments.map(segment => 
+                      segment.elements.map(element => (
+                        <div key={element.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="outline">{element.type}</Badge>
+                            <code className="text-sm">{element.variable}</code>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {element.type === 'text' ? element.text : 'URL da mídia'}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="font-medium">Exemplo de Requisição</Label>
+                  <div className="relative mt-2">
+                    <pre className="bg-gray-900 text-green-400 p-4 rounded text-sm overflow-x-auto">
+                      <code>{generateApiExample()}</code>
+                    </pre>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="absolute top-2 right-2"
+                      onClick={() => copyToClipboard(generateApiExample())}
+                    >
+                      <Copy className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="text-sm text-gray-600">
+                    Use essas informações para integrar com a API
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <Download className="w-4 h-4 mr-2" />
+                    Ver Documentação
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Canvas */}
         <div className="flex-1 p-8 overflow-auto">

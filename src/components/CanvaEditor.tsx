@@ -53,8 +53,6 @@ interface Element {
   
   // Media specific
   mediaUrl?: string;
-  borderRadius?: number;
-  shadow?: boolean;
 }
 
 interface Segment {
@@ -76,6 +74,13 @@ interface Template {
   segments: Segment[];
   variables: Record<string, any>;
 }
+
+const ASPECT_RATIOS = {
+  "9:16": { width: 1080, height: 1920, label: "Stories/Reels (9:16)" },
+  "16:9": { width: 1920, height: 1080, label: "Landscape (16:9)" },
+  "1:1": { width: 1080, height: 1080, label: "Square (1:1)" },
+  "4:5": { width: 1080, height: 1350, label: "Portrait (4:5)" }
+};
 
 export const CanvaEditor = () => {
   const { toast } = useToast();
@@ -101,10 +106,19 @@ export const CanvaEditor = () => {
   const [activeSegmentId, setActiveSegmentId] = useState('segment-1');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [draggedElement, setDraggedElement] = useState<Element | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [showVariables, setShowVariables] = useState(false);
 
   const activeSegment = template.segments.find(s => s.id === activeSegmentId);
   const selectedElement = activeSegment?.elements.find(e => e.id === selectedElementId);
+
+  const updateTemplateSize = (aspectRatio: keyof typeof ASPECT_RATIOS) => {
+    const { width, height } = ASPECT_RATIOS[aspectRatio];
+    setTemplate(prev => ({ ...prev, width, height }));
+  };
 
   const addSegment = () => {
     const newSegment: Segment = {
@@ -273,21 +287,105 @@ export const CanvaEditor = () => {
     }
   };
 
-  const handleElementDragStart = (element: Element) => {
-    setDraggedElement(element);
+  const handleMouseDown = (e: React.MouseEvent, element: Element, handle?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     setSelectedElementId(element.id);
+    
+    if (handle) {
+      setIsResizing(true);
+      setResizeHandle(handle);
+    } else {
+      setIsDragging(true);
+      setDraggedElement(element);
+    }
+    
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect) {
+      setDragStart({
+        x: e.clientX - rect.left - element.x,
+        y: e.clientY - rect.top - element.y
+      });
+    }
   };
 
-  const handleCanvasDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!draggedElement || !canvasRef.current) return;
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!canvasRef.current || !selectedElement) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-    updateElement(draggedElement.id, { x, y });
+    if (isDragging && draggedElement) {
+      const newX = Math.max(0, Math.min(template.width / 2 - selectedElement.width, mouseX - dragStart.x));
+      const newY = Math.max(0, Math.min(template.height / 2 - selectedElement.height, mouseY - dragStart.y));
+      
+      updateElement(selectedElement.id, { x: newX, y: newY });
+    } else if (isResizing && resizeHandle) {
+      const deltaX = mouseX - (selectedElement.x + selectedElement.width);
+      const deltaY = mouseY - (selectedElement.y + selectedElement.height);
+      
+      let newWidth = selectedElement.width;
+      let newHeight = selectedElement.height;
+      let newX = selectedElement.x;
+      let newY = selectedElement.y;
+
+      switch (resizeHandle) {
+        case 'se':
+          newWidth = Math.max(20, selectedElement.width + deltaX);
+          newHeight = Math.max(20, selectedElement.height + deltaY);
+          break;
+        case 'sw':
+          newWidth = Math.max(20, selectedElement.width - (mouseX - selectedElement.x));
+          newHeight = Math.max(20, selectedElement.height + deltaY);
+          newX = Math.min(selectedElement.x, mouseX);
+          break;
+        case 'ne':
+          newWidth = Math.max(20, selectedElement.width + deltaX);
+          newHeight = Math.max(20, selectedElement.height - (mouseY - selectedElement.y));
+          newY = Math.min(selectedElement.y, mouseY);
+          break;
+        case 'nw':
+          newWidth = Math.max(20, selectedElement.width - (mouseX - selectedElement.x));
+          newHeight = Math.max(20, selectedElement.height - (mouseY - selectedElement.y));
+          newX = Math.min(selectedElement.x, mouseX);
+          newY = Math.min(selectedElement.y, mouseY);
+          break;
+      }
+
+      updateElement(selectedElement.id, {
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setIsResizing(false);
     setDraggedElement(null);
+    setResizeHandle(null);
+  };
+
+  const renderResizeHandles = (element: Element) => {
+    if (selectedElementId !== element.id) return null;
+
+    const handles = ['nw', 'ne', 'sw', 'se'];
+    
+    return handles.map(handle => (
+      <div
+        key={handle}
+        className={`absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-${handle}-resize z-50`}
+        style={{
+          top: handle.includes('n') ? -6 : element.height - 6,
+          left: handle.includes('w') ? -6 : element.width - 6,
+        }}
+        onMouseDown={(e) => handleMouseDown(e, element, handle)}
+      />
+    ));
   };
 
   const renderElement = (element: Element) => {
@@ -300,7 +398,7 @@ export const CanvaEditor = () => {
       transform: `rotate(${element.rotation}deg)`,
       opacity: element.opacity,
       zIndex: element.zIndex,
-      cursor: 'move',
+      cursor: isDragging ? 'grabbing' : 'grab',
       border: selectedElementId === element.id ? '2px solid #3b82f6' : '1px dashed #ccc',
       borderRadius: element.borderRadius || 0,
       boxShadow: element.shadow ? '0 4px 8px rgba(0,0,0,0.2)' : 'none'
@@ -324,13 +422,20 @@ export const CanvaEditor = () => {
                            element.textAlign === 'right' ? 'flex-end' : 'flex-start',
             padding: '8px',
             wordWrap: 'break-word',
-            outline: element.outline ? `${element.outlineWidth}px solid ${element.outlineColor}` : 'none'
+            outline: element.outline ? `${element.outlineWidth}px solid ${element.outlineColor}` : 'none',
+            overflow: 'hidden'
           }}
-          draggable
-          onDragStart={() => handleElementDragStart(element)}
+          onMouseDown={(e) => handleMouseDown(e, element)}
           onClick={() => setSelectedElementId(element.id)}
         >
-          {element.text || element.variable}
+          <span style={{ 
+            wordBreak: 'break-word', 
+            overflowWrap: 'break-word',
+            hyphens: 'auto'
+          }}>
+            {element.text || element.variable}
+          </span>
+          {renderResizeHandles(element)}
         </div>
       );
     }
@@ -339,14 +444,14 @@ export const CanvaEditor = () => {
       <div
         key={element.id}
         style={style}
-        draggable
-        onDragStart={() => handleElementDragStart(element)}
+        onMouseDown={(e) => handleMouseDown(e, element)}
         onClick={() => setSelectedElementId(element.id)}
       >
         <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm">
           {element.type === 'image' ? <ImageIcon /> : <Video />}
           <span className="ml-2">{element.variable}</span>
         </div>
+        {renderResizeHandles(element)}
       </div>
     );
   };
@@ -426,6 +531,30 @@ export const CanvaEditor = () => {
               className="w-64"
               placeholder="Nome do template"
             />
+            
+            <Select
+              value={`${template.width}:${template.height}`}
+              onValueChange={(value) => {
+                const ratio = Object.entries(ASPECT_RATIOS).find(
+                  ([_, config]) => `${config.width}:${config.height}` === value
+                );
+                if (ratio) {
+                  updateTemplateSize(ratio[0] as keyof typeof ASPECT_RATIOS);
+                }
+              }}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(ASPECT_RATIOS).map(([key, config]) => (
+                  <SelectItem key={key} value={`${config.width}:${config.height}`}>
+                    {config.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
             <Badge variant="outline">{template.width}x{template.height}</Badge>
           </div>
           
@@ -452,8 +581,9 @@ export const CanvaEditor = () => {
                 height: template.height / 2,
                 backgroundColor: activeSegment?.backgroundColor
               }}
-              onDrop={handleCanvasDrop}
-              onDragOver={(e) => e.preventDefault()}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
             >
               {activeSegment?.elements.map(renderElement)}
               
@@ -480,6 +610,42 @@ export const CanvaEditor = () => {
         </div>
 
         <div className="p-4 space-y-6">
+          {/* Configurações do Template */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Template</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Nome</Label>
+                <Input
+                  value={template.name}
+                  onChange={(e) => setTemplate(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+              
+              <div>
+                <Label>Descrição</Label>
+                <Textarea
+                  value={template.description}
+                  onChange={(e) => setTemplate(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Descrição do template..."
+                />
+              </div>
+              
+              <div>
+                <Label>FPS</Label>
+                <Input
+                  type="number"
+                  min="15"
+                  max="60"
+                  value={template.fps}
+                  onChange={(e) => setTemplate(prev => ({ ...prev, fps: Number(e.target.value) }))}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Configurações do Segmento */}
           {activeSegment && (
             <Card>

@@ -1,16 +1,26 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Video, Zap, BarChart3, Settings, Play, Download, Clock, CheckCircle, AlertCircle, Plus, Code } from "lucide-react";
-import { VideoCreator } from "@/components/VideoCreator";
-import { AdminPanel } from "@/components/AdminPanel";
+import { Video, Edit, Database, Code, CheckCircle } from "lucide-react";
+import { CanvaEditor } from "@/components/CanvaEditor";
+import { TemplateManager } from "@/components/TemplateManager";
 import { ApiDocumentation } from "@/components/ApiDocumentation";
 
 const Index = () => {
-  const [activeTab, setActiveTab] = useState("creator");
+  const [activeTab, setActiveTab] = useState("editor");
+  const [editingTemplate, setEditingTemplate] = useState(null);
+
+  const handleEditTemplate = (template: any) => {
+    setEditingTemplate(template);
+    setActiveTab("editor");
+  };
+
+  const handleCreateNew = () => {
+    setEditingTemplate(null);
+    setActiveTab("editor");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
@@ -24,15 +34,15 @@ const Index = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                  ClipCraft
+                  ClipCraft Pro
                 </h1>
-                <p className="text-sm text-gray-600">Sistema de Criação de Vídeos para Redes Sociais</p>
+                <p className="text-sm text-gray-600">Editor Visual de Vídeos com FFmpeg</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
               <Badge variant="secondary" className="bg-green-100 text-green-700">
                 <CheckCircle className="w-3 h-3 mr-1" />
-                API Ativa
+                FFmpeg Ativo
               </Badge>
             </div>
           </div>
@@ -43,13 +53,13 @@ const Index = () => {
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-8 bg-white/50 backdrop-blur-sm">
-            <TabsTrigger value="creator" className="flex items-center space-x-2">
-              <Plus className="w-4 h-4" />
-              <span>Criar Vídeo</span>
+            <TabsTrigger value="editor" className="flex items-center space-x-2">
+              <Edit className="w-4 h-4" />
+              <span>Editor</span>
             </TabsTrigger>
-            <TabsTrigger value="admin" className="flex items-center space-x-2">
-              <BarChart3 className="w-4 h-4" />
-              <span>Painel Admin</span>
+            <TabsTrigger value="templates" className="flex items-center space-x-2">
+              <Database className="w-4 h-4" />
+              <span>Templates</span>
             </TabsTrigger>
             <TabsTrigger value="api" className="flex items-center space-x-2">
               <Code className="w-4 h-4" />
@@ -57,83 +67,27 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Video Creator Tab */}
-          <TabsContent value="creator" className="space-y-6">
+          {/* Editor Tab */}
+          <TabsContent value="editor" className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Crie Vídeos para Redes Sociais
+                Editor Visual de Templates
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Sistema otimizado para criação de vídeos nos formatos mais utilizados: 
-                Instagram Posts (1:1), Stories (9:16), Feed (4:5) e YouTube (16:9).
+                Crie templates visuais com elementos arrastar e soltar. 
+                Sistema real com FFmpeg para geração de vídeos de alta qualidade.
               </p>
             </div>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-              <Card className="border-0 bg-white/60 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Video className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">1:1</p>
-                      <p className="text-sm text-gray-600">Instagram Post</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 bg-white/60 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Video className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">9:16</p>
-                      <p className="text-sm text-gray-600">Stories/Reels</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 bg-white/60 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Video className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">4:5</p>
-                      <p className="text-sm text-gray-600">Feed Vertical</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 bg-white/60 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                      <Video className="w-6 h-6 text-orange-600" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">16:9</p>
-                      <p className="text-sm text-gray-600">YouTube</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <VideoCreator />
+            <CanvaEditor />
           </TabsContent>
 
-          {/* Admin Panel Tab */}
-          <TabsContent value="admin" className="space-y-6">
-            <AdminPanel />
+          {/* Templates Tab */}
+          <TabsContent value="templates" className="space-y-6">
+            <TemplateManager 
+              onEditTemplate={handleEditTemplate}
+              onCreateNew={handleCreateNew}
+            />
           </TabsContent>
 
           {/* API Documentation Tab */}

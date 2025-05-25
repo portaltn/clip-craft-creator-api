@@ -1,4 +1,57 @@
+
 const API_BASE_URL = 'http://localhost:3001/api';
+
+export interface Element {
+  id: string;
+  type: 'image' | 'video' | 'text';
+  variable: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  opacity: number;
+  zIndex: number;
+  
+  // Text specific
+  text?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: 'normal' | 'bold';
+  textAlign?: 'left' | 'center' | 'right';
+  color?: string;
+  backgroundColor?: string;
+  borderRadius?: number;
+  shadow?: boolean;
+  outline?: boolean;
+  outlineColor?: string;
+  outlineWidth?: number;
+  
+  // Media specific
+  mediaUrl?: string;
+}
+
+export interface Segment {
+  id: string;
+  name: string;
+  duration: number;
+  transition: string;
+  backgroundColor: string;
+  elements: Element[];
+}
+
+export interface Template {
+  id?: string;
+  name: string;
+  description: string;
+  width: number;
+  height: number;
+  fps: number;
+  segments: Segment[];
+  variables: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface VideoSegment {
   id: string;
@@ -17,6 +70,8 @@ export interface VideoConfig {
   backgroundAudio?: string;
   resize?: string;
   fps?: number;
+  template_id?: string;
+  variables?: Record<string, any>;
 }
 
 export interface VideoJob {
@@ -82,7 +137,6 @@ export class ClipCraftAPI {
       }
     }
 
-    // Obter o blob do vídeo
     const blob = await response.blob();
     console.log(`Blob recebido. Tamanho: ${blob.size} bytes`);
 
@@ -90,7 +144,6 @@ export class ClipCraftAPI {
       throw new Error('Arquivo vazio recebido');
     }
 
-    // Criar URL para download
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.style.display = 'none';
@@ -101,7 +154,6 @@ export class ClipCraftAPI {
     console.log('Iniciando download do arquivo...');
     a.click();
     
-    // Cleanup
     setTimeout(() => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
@@ -109,21 +161,79 @@ export class ClipCraftAPI {
     }, 100);
   }
 
-  async getJobs(): Promise<VideoJob[]> {
-    const response = await fetch(`${this.baseUrl}/jobs`);
+  // Template methods
+  async saveTemplate(template: Template): Promise<{ success: boolean; template_id: string; message: string }> {
+    const response = await fetch(`${this.baseUrl}/templates`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(template),
+    });
 
     if (!response.ok) {
-      throw new Error('Erro ao buscar jobs');
+      const error = await response.json();
+      throw new Error(error.error || 'Erro ao salvar template');
     }
 
     return response.json();
   }
 
-  async getTemplates(): Promise<any> {
+  async getTemplates(): Promise<Template[]> {
     const response = await fetch(`${this.baseUrl}/templates`);
 
     if (!response.ok) {
       throw new Error('Erro ao buscar templates');
+    }
+
+    return response.json();
+  }
+
+  async getTemplate(templateId: string): Promise<Template> {
+    const response = await fetch(`${this.baseUrl}/templates/${templateId}`);
+
+    if (!response.ok) {
+      throw new Error('Erro ao buscar template');
+    }
+
+    return response.json();
+  }
+
+  async updateTemplate(templateId: string, template: Partial<Template>): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${this.baseUrl}/templates/${templateId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(template),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Erro ao atualizar template');
+    }
+
+    return response.json();
+  }
+
+  async deleteTemplate(templateId: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${this.baseUrl}/templates/${templateId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Erro ao deletar template');
+    }
+
+    return response.json();
+  }
+
+  async getJobs(): Promise<VideoJob[]> {
+    const response = await fetch(`${this.baseUrl}/jobs`);
+
+    if (!response.ok) {
+      throw new Error('Erro ao buscar jobs');
     }
 
     return response.json();

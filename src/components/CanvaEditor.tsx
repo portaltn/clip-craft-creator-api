@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,9 +20,12 @@ import {
   Save,
   Eye,
   Settings,
-  Download
+  Download,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Element {
   id: string;
@@ -242,6 +244,43 @@ export const CanvaEditor = () => {
     }));
   };
 
+  // Layer control functions
+  const bringForward = (elementId: string) => {
+    if (!activeSegment) return;
+    
+    const element = activeSegment.elements.find(e => e.id === elementId);
+    if (!element) return;
+
+    const maxZIndex = Math.max(...activeSegment.elements.map(e => e.zIndex));
+    if (element.zIndex < maxZIndex) {
+      updateElement(elementId, { zIndex: element.zIndex + 1 });
+      
+      // Adjust the element that was previously at this z-index
+      const elementToSwap = activeSegment.elements.find(e => e.zIndex === element.zIndex + 1 && e.id !== elementId);
+      if (elementToSwap) {
+        updateElement(elementToSwap.id, { zIndex: element.zIndex });
+      }
+    }
+  };
+
+  const sendBackward = (elementId: string) => {
+    if (!activeSegment) return;
+    
+    const element = activeSegment.elements.find(e => e.id === elementId);
+    if (!element) return;
+
+    const minZIndex = Math.min(...activeSegment.elements.map(e => e.zIndex));
+    if (element.zIndex > minZIndex) {
+      updateElement(elementId, { zIndex: element.zIndex - 1 });
+      
+      // Adjust the element that was previously at this z-index
+      const elementToSwap = activeSegment.elements.find(e => e.zIndex === element.zIndex - 1 && e.id !== elementId);
+      if (elementToSwap) {
+        updateElement(elementToSwap.id, { zIndex: element.zIndex });
+      }
+    }
+  };
+
   const saveTemplate = async () => {
     try {
       // Extrair variáveis dos elementos
@@ -259,26 +298,45 @@ export const CanvaEditor = () => {
       });
 
       const templateData = {
-        ...template,
+        name: template.name,
+        description: template.description,
+        width: template.width,
+        height: template.height,
+        fps: template.fps,
+        segments: template.segments,
         variables
       };
 
-      const response = await fetch('http://localhost:3001/api/templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(templateData)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setTemplate(prev => ({ ...prev, id: result.template_id }));
-        toast({
-          title: "Template Salvo",
-          description: `Template salvo com ID: ${result.template_id}`
-        });
-        setShowVariables(true);
+      let result;
+      if (template.id) {
+        // Update existing template
+        result = await supabase
+          .from('templates')
+          .update(templateData)
+          .eq('id', template.id)
+          .select()
+          .single();
+      } else {
+        // Create new template
+        result = await supabase
+          .from('templates')
+          .insert(templateData)
+          .select()
+          .single();
       }
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      setTemplate(prev => ({ ...prev, id: result.data.id }));
+      toast({
+        title: "Template Salvo",
+        description: `Template salvo com sucesso!`
+      });
+      setShowVariables(true);
     } catch (error) {
+      console.error('Erro ao salvar template:', error);
       toast({
         title: "Erro ao Salvar",
         description: "Erro ao salvar template",
@@ -323,26 +381,28 @@ export const CanvaEditor = () => {
       
       updateElement(selectedElement.id, { x: newX, y: newY });
     } else if (isResizing && resizeHandle) {
-      const deltaX = mouseX - (selectedElement.x + selectedElement.width);
-      const deltaY = mouseY - (selectedElement.y + selectedElement.height);
-      
       let newWidth = selectedElement.width;
       let newHeight = selectedElement.height;
       let newX = selectedElement.x;
       let newY = selectedElement.y;
 
       switch (resizeHandle) {
-        case 'se':
-          newWidth = Math.max(20, selectedElement.width + deltaX);
-          newHeight = Math.max(20, selectedElement.height + deltaY);
+        case 'n':
+          newHeight = Math.max(20, selectedElement.height - (mouseY - selectedElement.y));
+          newY = Math.min(selectedElement.y, mouseY);
           break;
-        case 'sw':
+        case 's':
+          newHeight = Math.max(20, mouseY - selectedElement.y);
+          break;
+        case 'e':
+          newWidth = Math.max(20, mouseX - selectedElement.x);
+          break;
+        case 'w':
           newWidth = Math.max(20, selectedElement.width - (mouseX - selectedElement.x));
-          newHeight = Math.max(20, selectedElement.height + deltaY);
           newX = Math.min(selectedElement.x, mouseX);
           break;
         case 'ne':
-          newWidth = Math.max(20, selectedElement.width + deltaX);
+          newWidth = Math.max(20, mouseX - selectedElement.x);
           newHeight = Math.max(20, selectedElement.height - (mouseY - selectedElement.y));
           newY = Math.min(selectedElement.y, mouseY);
           break;
@@ -351,6 +411,15 @@ export const CanvaEditor = () => {
           newHeight = Math.max(20, selectedElement.height - (mouseY - selectedElement.y));
           newX = Math.min(selectedElement.x, mouseX);
           newY = Math.min(selectedElement.y, mouseY);
+          break;
+        case 'se':
+          newWidth = Math.max(20, mouseX - selectedElement.x);
+          newHeight = Math.max(20, mouseY - selectedElement.y);
+          break;
+        case 'sw':
+          newWidth = Math.max(20, selectedElement.width - (mouseX - selectedElement.x));
+          newHeight = Math.max(20, mouseY - selectedElement.y);
+          newX = Math.min(selectedElement.x, mouseX);
           break;
       }
 
@@ -373,17 +442,23 @@ export const CanvaEditor = () => {
   const renderResizeHandles = (element: Element) => {
     if (selectedElementId !== element.id) return null;
 
-    const handles = ['nw', 'ne', 'sw', 'se'];
+    const handles = [
+      { key: 'nw', style: { top: -6, left: -6, cursor: 'nw-resize' } },
+      { key: 'n', style: { top: -6, left: element.width / 2 - 6, cursor: 'n-resize' } },
+      { key: 'ne', style: { top: -6, right: -6, cursor: 'ne-resize' } },
+      { key: 'e', style: { top: element.height / 2 - 6, right: -6, cursor: 'e-resize' } },
+      { key: 'se', style: { bottom: -6, right: -6, cursor: 'se-resize' } },
+      { key: 's', style: { bottom: -6, left: element.width / 2 - 6, cursor: 's-resize' } },
+      { key: 'sw', style: { bottom: -6, left: -6, cursor: 'sw-resize' } },
+      { key: 'w', style: { top: element.height / 2 - 6, left: -6, cursor: 'w-resize' } }
+    ];
     
     return handles.map(handle => (
       <div
-        key={handle}
-        className={`absolute w-3 h-3 bg-blue-500 border border-white rounded-sm cursor-${handle}-resize z-50`}
-        style={{
-          top: handle.includes('n') ? -6 : element.height - 6,
-          left: handle.includes('w') ? -6 : element.width - 6,
-        }}
-        onMouseDown={(e) => handleMouseDown(e, element, handle)}
+        key={handle.key}
+        className="absolute w-3 h-3 bg-blue-500 border border-white rounded-sm z-50"
+        style={{ ...handle.style, cursor: handle.style.cursor }}
+        onMouseDown={(e) => handleMouseDown(e, element, handle.key)}
       />
     ));
   };
@@ -400,39 +475,42 @@ export const CanvaEditor = () => {
       zIndex: element.zIndex,
       cursor: isDragging ? 'grabbing' : 'grab',
       border: selectedElementId === element.id ? '2px solid #3b82f6' : '1px dashed #ccc',
-      borderRadius: element.borderRadius || 0,
-      boxShadow: element.shadow ? '0 4px 8px rgba(0,0,0,0.2)' : 'none'
+      borderRadius: element.type !== 'text' ? (element.borderRadius || 0) : 0,
+      boxShadow: element.type !== 'text' && element.shadow ? '0 4px 8px rgba(0,0,0,0.2)' : 'none'
     };
 
     if (element.type === 'text') {
+      const textStyle: React.CSSProperties = {
+        fontSize: element.fontSize,
+        fontFamily: element.fontFamily,
+        fontWeight: element.fontWeight,
+        textAlign: element.textAlign as any,
+        color: element.color,
+        textShadow: element.shadow ? '2px 2px 4px rgba(0,0,0,0.5)' : 'none',
+        WebkitTextStroke: element.outline ? `${element.outlineWidth}px ${element.outlineColor}` : 'none',
+        wordBreak: 'break-word',
+        overflowWrap: 'break-word',
+        hyphens: 'auto'
+      };
+
       return (
         <div
           key={element.id}
           style={{
             ...style,
             backgroundColor: element.backgroundColor,
-            color: element.color,
-            fontSize: element.fontSize,
-            fontFamily: element.fontFamily,
-            fontWeight: element.fontWeight,
-            textAlign: element.textAlign as any,
+            borderRadius: element.borderRadius || 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: element.textAlign === 'center' ? 'center' : 
                            element.textAlign === 'right' ? 'flex-end' : 'flex-start',
             padding: '8px',
-            wordWrap: 'break-word',
-            outline: element.outline ? `${element.outlineWidth}px solid ${element.outlineColor}` : 'none',
             overflow: 'hidden'
           }}
           onMouseDown={(e) => handleMouseDown(e, element)}
           onClick={() => setSelectedElementId(element.id)}
         >
-          <span style={{ 
-            wordBreak: 'break-word', 
-            overflowWrap: 'break-word',
-            hyphens: 'auto'
-          }}>
+          <span style={textStyle}>
             {element.text || element.variable}
           </span>
           {renderResizeHandles(element)}
@@ -734,6 +812,22 @@ export const CanvaEditor = () => {
                 <CardTitle className="text-sm flex items-center justify-between">
                   Elemento: {selectedElement.type}
                   <div className="flex space-x-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => bringForward(selectedElement.id)}
+                      title="Trazer para frente"
+                    >
+                      <ChevronUp className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => sendBackward(selectedElement.id)}
+                      title="Enviar para trás"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"

@@ -17,6 +17,7 @@ import {
   Calendar
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Template {
   id: string;
@@ -50,11 +51,16 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
 
   const loadTemplates = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/templates');
-      if (response.ok) {
-        const data = await response.json();
-        setTemplates(data);
+      const { data, error } = await supabase
+        .from('templates')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
       }
+
+      setTemplates(data || []);
     } catch (error) {
       console.error('Erro ao carregar templates:', error);
       toast({
@@ -71,18 +77,22 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
     if (!confirm('Tem certeza que deseja deletar este template?')) return;
 
     try {
-      const response = await fetch(`http://localhost:3001/api/templates/${templateId}`, {
-        method: 'DELETE'
-      });
+      const { error } = await supabase
+        .from('templates')
+        .delete()
+        .eq('id', templateId);
 
-      if (response.ok) {
-        setTemplates(prev => prev.filter(t => t.id !== templateId));
-        toast({
-          title: "Template Deletado",
-          description: "Template deletado com sucesso"
-        });
+      if (error) {
+        throw error;
       }
+
+      setTemplates(prev => prev.filter(t => t.id !== templateId));
+      toast({
+        title: "Template Deletado",
+        description: "Template deletado com sucesso"
+      });
     } catch (error) {
+      console.error('Erro ao deletar template:', error);
       toast({
         title: "Erro",
         description: "Erro ao deletar template",
@@ -94,26 +104,30 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
   const duplicateTemplate = async (template: Template) => {
     try {
       const duplicatedTemplate = {
-        ...template,
         name: `${template.name} (Cópia)`,
-        description: `Cópia de: ${template.description}`
+        description: `Cópia de: ${template.description}`,
+        width: template.width,
+        height: template.height,
+        fps: template.fps,
+        segments: template.segments,
+        variables: template.variables
       };
-      delete duplicatedTemplate.id;
 
-      const response = await fetch('http://localhost:3001/api/templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(duplicatedTemplate)
-      });
+      const { error } = await supabase
+        .from('templates')
+        .insert(duplicatedTemplate);
 
-      if (response.ok) {
-        await loadTemplates();
-        toast({
-          title: "Template Duplicado",
-          description: "Template duplicado com sucesso"
-        });
+      if (error) {
+        throw error;
       }
+
+      await loadTemplates();
+      toast({
+        title: "Template Duplicado",
+        description: "Template duplicado com sucesso"
+      });
     } catch (error) {
+      console.error('Erro ao duplicar template:', error);
       toast({
         title: "Erro",
         description: "Erro ao duplicar template",
@@ -124,7 +138,7 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
 
   const filteredTemplates = templates.filter(template =>
     template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    template.description.toLowerCase().includes(searchTerm.toLowerCase())
+    template.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const formatDate = (dateString: string) => {
@@ -209,7 +223,7 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
                 <div className="flex items-center space-x-2 mt-3">
                   <Badge variant="secondary">{template.width}x{template.height}</Badge>
                   <Badge variant="outline">{template.fps} FPS</Badge>
-                  <Badge variant="outline">{template.segments.length} segmentos</Badge>
+                  <Badge variant="outline">{template.segments?.length || 0} segmentos</Badge>
                 </div>
               </CardHeader>
               
@@ -218,14 +232,14 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
                 <div className="bg-gray-50 rounded-lg p-3">
                   <div className="text-sm font-medium mb-2">Elementos:</div>
                   <div className="flex flex-wrap gap-1">
-                    {Object.keys(template.variables).slice(0, 3).map((variable) => (
+                    {Object.keys(template.variables || {}).slice(0, 3).map((variable) => (
                       <Badge key={variable} variant="outline" className="text-xs">
                         {variable}
                       </Badge>
                     ))}
-                    {Object.keys(template.variables).length > 3 && (
+                    {Object.keys(template.variables || {}).length > 3 && (
                       <Badge variant="outline" className="text-xs">
-                        +{Object.keys(template.variables).length - 3} mais
+                        +{Object.keys(template.variables || {}).length - 3} mais
                       </Badge>
                     )}
                   </div>
@@ -307,7 +321,7 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
               <div>
                 <h4 className="font-medium mb-3">Variáveis para Integração</h4>
                 <div className="space-y-3">
-                  {Object.entries(selectedTemplate.variables).map(([key, value]) => (
+                  {Object.entries(selectedTemplate.variables || {}).map(([key, value]) => (
                     <div key={key} className="border rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
                         <Label className="font-medium">{key}</Label>
@@ -333,7 +347,7 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
 {
   "template_id": "${selectedTemplate.id}",
   "variables": {
-${Object.keys(selectedTemplate.variables).map(key => `    "${key}": "seu_valor_aqui"`).join(',\n')}
+${Object.keys(selectedTemplate.variables || {}).map(key => `    "${key}": "seu_valor_aqui"`).join(',\n')}
   },
   "resize": "${selectedTemplate.width}x${selectedTemplate.height}",
   "fps": ${selectedTemplate.fps}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +17,46 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
+
+interface Element {
+  id: string;
+  type: 'image' | 'video' | 'text';
+  variable: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  opacity: number;
+  zIndex: number;
+  
+  // Text specific
+  text?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: 'normal' | 'bold';
+  textAlign?: 'left' | 'center' | 'right';
+  color?: string;
+  backgroundColor?: string;
+  borderRadius?: number;
+  shadow?: boolean;
+  outline?: boolean;
+  outlineColor?: string;
+  outlineWidth?: number;
+  
+  // Media specific
+  mediaUrl?: string;
+}
+
+interface Segment {
+  id: string;
+  name: string;
+  duration: number;
+  transition: string;
+  backgroundColor: string;
+  elements: Element[];
+}
 
 interface Template {
   id: string;
@@ -26,7 +65,7 @@ interface Template {
   width: number;
   height: number;
   fps: number;
-  segments: any[];
+  segments: Segment[];
   variables: Record<string, any>;
   created_at: string;
   updated_at?: string;
@@ -60,7 +99,14 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
         throw error;
       }
 
-      setTemplates(data || []);
+      // Convert Json types back to proper interfaces
+      const convertedTemplates = (data || []).map(template => ({
+        ...template,
+        segments: template.segments as unknown as Segment[],
+        variables: template.variables as unknown as Record<string, any>
+      }));
+
+      setTemplates(convertedTemplates);
     } catch (error) {
       console.error('Erro ao carregar templates:', error);
       toast({
@@ -109,8 +155,8 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
         width: template.width,
         height: template.height,
         fps: template.fps,
-        segments: template.segments,
-        variables: template.variables
+        segments: template.segments as Json,
+        variables: template.variables as Json
       };
 
       const { error } = await supabase

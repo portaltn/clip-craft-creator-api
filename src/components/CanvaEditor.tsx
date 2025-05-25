@@ -305,8 +305,8 @@ export const CanvaEditor = () => {
         width: template.width,
         height: template.height,
         fps: template.fps,
-        segments: template.segments as Json,
-        variables: variables as Json
+        segments: template.segments as unknown as Json,
+        variables: variables as unknown as Json
       };
 
       let result;

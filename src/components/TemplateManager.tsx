@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -155,8 +156,8 @@ export const TemplateManager = ({ onEditTemplate, onCreateNew }: TemplateManager
         width: template.width,
         height: template.height,
         fps: template.fps,
-        segments: template.segments as Json,
-        variables: template.variables as Json
+        segments: template.segments as unknown as Json,
+        variables: template.variables as unknown as Json
       };
 
       const { error } = await supabase
